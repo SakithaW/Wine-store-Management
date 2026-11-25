@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retail Shop Bottle Management System v6.1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans select-none">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <i class="fa-solid fa-bottle-water text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-wide text-white">BottlePOS <span class="text-xs font-normal bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded ml-1">Retail Shop v6.1</span></h1>
+                <p class="text-xs text-slate-400">Dual-State Inventory & Deposit Management System</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher & API Status -->
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button id="btn-pos-view" onclick="switchView('pos')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-blue-600 text-white shadow">
+                    <i class="fa-solid fa-cash-register mr-1.5"></i>POS Terminal (Cashier)
+                </button>
+                <button id="btn-admin-view" onclick="switchView('admin')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-chart-pie mr-1.5"></i>Admin Dashboard (Manager)
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+                <span id="api-status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="api-status-text" class="text-xs font-medium text-slate-300">Local / FastAPI Ready</span>
+                <button onclick="openApiConfigModal()" class="text-slate-400 hover:text-white ml-2" title="Configure FastAPI URL">
+                    <i class="fa-solid fa-gear text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN VIEW 1: POS CHECKOUT SCREEN (CASHIER VIEW) -->
+    <main id="view-pos" class="flex-1 grid grid-cols-12 gap-6 p-6 overflow-hidden">
+        
+        <!-- Left Column (Cart / Receipt - 4 Columns) -->
+        <div class="col-span-12 lg:col-span-4 bg-slate-800/90 border border-slate-700/80 rounded-2xl flex flex-col overflow-hidden shadow-xl">
+            <!-- Cart Header -->
+            <div class="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                <div>
+                    <h2 class="font-bold text-base text-white flex items-center">
+                        <i class="fa-solid fa-receipt text-blue-400 mr-2"></i>Current Transaction
+                    </h2>
+                    <p class="text-xs text-slate-400" id="pos-receipt-id">Receipt #TMP-001</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="number" id="customer-id-input" placeholder="Customer ID (Opt)" class="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 w-32 text-slate-200 focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <!-- Cart Items List -->
+            <div id="cart-items-container" class="flex-1 p-4 overflow-y-auto space-y-2.5 max-h-[420px]">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <!-- Cart Summary & Totals -->
+            <div class="p-5 bg-slate-900/95 border-t border-slate-700/80 space-y-3">
+                <div class="space-y-1.5 text-sm">
+                    <div class="flex justify-between text-slate-400">
+                        <span>Liquid / Contents Subtotal:</span>
+                        <span id="summary-liquid" class="font-medium text-slate-200">Rs. 0.00</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>New Deposits Charged (+):</span>
+                        <span id="summary-deposit-add" class="font-medium text-emerald-400">Rs. 0.00</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Empty Deposit Refunds (-):</span>
+                        <span id="summary-deposit-ref" class="font-medium text-amber-400">Rs. 0.00</span>
+                    </div>
+                    <div class="border-t border-slate-800 pt-2 flex justify-between items-baseline">
+                        <span class="text-base font-bold text-white">Net Grand Total:</span>
+                        <span id="summary-grand-total" class="text-2xl font-extrabold text-emerald-400">Rs. 0.00</span>
+                    </div>
+                    <p id="refund-notice" class="hidden text-xs text-amber-400 text-right font-medium">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>Negative total: Issue cash refund to customer
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="clearCart()" class="py-3 px-4 rounded-xl font-bold text-sm bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition flex items-center justify-center">
+                        <i class="fa-solid fa-trash-can mr-2"></i>Cancel Order
+                    </button>
+                    <button onclick="processTransaction()" class="py-3 px-4 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 transition flex items-center justify-center">
+                        <i class="fa-solid fa-check-circle mr-2"></i>Process Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column (Product Action Grid - 8 Columns) -->
+        <div class="col-span-12 lg:col-span-8 flex flex-col space-y-4">
+            
+            <!-- Search & Barcode Bar -->
+            <div class="bg-slate-800/90 border border-slate-700/80 p-4 rounded-2xl flex flex-wrap gap-4 items-center justify-between shadow-lg">
+                <div class="relative flex-1 min-w-[240px]">
+                    <i class="fa-solid fa-barcode absolute left-3.5 top-3 text-slate-400"></i>
+                    <input type="text" id="barcode-search" oninput="renderProductGrid()" placeholder="Scan barcode (e.g., 1001) or search bottle name... [Press Enter to quick-select]" 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <div class="flex items-center space-x-2" id="category-filters">
+                    <button onclick="filterCategory('ALL')" class="cat-btn active px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white">All Items</button>
+                    <button onclick="filterCategory('Water')" class="cat-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-400 hover:text-white border border-slate-700">Water</button>
+                    <button onclick="filterCategory('Gas')" class="cat-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-400 hover:text-white border border-slate-700">Gas</button>
+                    <button onclick="filterCategory('Beverage')" class="cat-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-400 hover:text-white border border-slate-700">Glass / Beverage</button>
+                </div>
+            </div>
+
+            <!-- Bottle Cards Grid (With Product Images) -->
+            <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto pr-1">
+                <!-- Populated dynamically via JS -->
+            </div>
+
+            <!-- Quick Instructions Footer -->
+            <div class="mt-auto bg-slate-800/50 border border-slate-800 rounded-xl p-3 flex items-center justify-between text-xs text-slate-400">
+                <div><i class="fa-solid fa-camera text-blue-400 mr-1.5"></i><strong>Custom Product Photos:</strong> Upload or change bottle photos anytime in the <span class="text-white font-semibold">Admin Dashboard</span>.</div>
+                <div>Historical Deposit Locking Active</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MAIN VIEW 2: ADMIN DASHBOARD (SHOP MANAGER VIEW) -->
+    <main id="view-admin" class="hidden flex-1 bg-slate-100 text-slate-800 p-6 overflow-y-auto">
+        <div class="max-w-7xl mx-auto space-y-6">
+            
+            <!-- Dashboard Header -->
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-slate-900">Shop Manager Dashboard</h2>
+                    <p class="text-sm text-slate-500">Live dual-state inventory tracking, product photos, catalog pricing, and deposit ledger</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="openSupplierDeliveryModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow flex items-center">
+                        <i class="fa-solid fa-truck-ramp-box mr-2"></i>Record Supplier Delivery
+                    </button>
+                    <button onclick="openAddBottleModal()" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow flex items-center">
+                        <i class="fa-solid fa-plus mr-2"></i>Add New Bottle Type
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Full Stock Value</p>
+                            <h3 id="kpi-full-value" class="text-2xl font-extrabold text-slate-900 mt-1">Rs. 0.00</h3>
+                        </div>
+                        <div class="bg-emerald-100 text-emerald-600 p-2.5 rounded-xl">
+                            <i class="fa-solid fa-boxes-stacked text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Liquid + Bottle Asset Value</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Full Units Ready</p>
+                            <h3 id="kpi-full-units" class="text-2xl font-extrabold text-emerald-600 mt-1">0</h3>
+                        </div>
+                        <div class="bg-blue-100 text-blue-600 p-2.5 rounded-xl">
+                            <i class="fa-solid fa-bottle-water text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Available for immediate sale</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Empties Pending</p>
+                            <h3 id="kpi-empty-units" class="text-2xl font-extrabold text-amber-600 mt-1">0</h3>
+                        </div>
+                        <div class="bg-amber-100 text-amber-600 p-2.5 rounded-xl">
+                            <i class="fa-solid fa-recycle text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Waiting for supplier exchange</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Net Today's Revenue</p>
+                            <h3 id="kpi-today-sales" class="text-2xl font-extrabold text-indigo-600 mt-1">Rs. 0.00</h3>
+                        </div>
+                        <div class="bg-indigo-100 text-indigo-600 p-2.5 rounded-xl">
+                            <i class="fa-solid fa-sack-dollar text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">From <span id="kpi-tx-count">0</span> POS transactions</p>
+                </div>
+            </div>
+
+            <!-- Inventory & Catalog Master Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 text-base">Master Catalog & Dual-State Inventory Table</h3>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-medium">Click "Edit" on any row to upload a custom product photo</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
+                                <th class="py-3.5 px-6 font-bold">Product</th>
+                                <th class="py-3.5 px-6 font-bold">ID / SKU</th>
+                                <th class="py-3.5 px-6 font-bold">Category</th>
+                                <th class="py-3.5 px-6 font-bold">Liquid Price</th>
+                                <th class="py-3.5 px-6 font-bold">Deposit Value</th>
+                                <th class="py-3.5 px-6 font-bold text-center">Full Qty (Sales)</th>
+                                <th class="py-3.5 px-6 font-bold text-center">Empty Qty (Returns)</th>
+                                <th class="py-3.5 px-6 font-bold text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-inventory-tbody" class="divide-y divide-slate-200 text-sm">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Transaction History Log (With Locked Deposits) -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-base">Recent Transactions & Historical Deposit Ledger</h3>
+                        <p class="text-xs text-slate-500">Deposits are locked at transaction time to prevent retroactive price disputes</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
+                                <th class="py-3 px-6 font-bold">Tx ID</th>
+                                <th class="py-3 px-6 font-bold">Timestamp</th>
+                                <th class="py-3 px-6 font-bold">Customer ID</th>
+                                <th class="py-3 px-6 font-bold">Line Items & Locked Deposit</th>
+                                <th class="py-3 px-6 font-bold text-right">Total Paid / Refunded</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-tx-tbody" class="divide-y divide-slate-200 text-sm">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- MODAL 1: POS ACTION OVERLAY (NEW SALE / EXCHANGE / RETURN) -->
+    <div id="action-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center space-x-3.5">
+                    <img id="modal-bottle-img" src="images/19l-water.svg" alt="Bottle" class="w-16 h-16 rounded-xl object-contain bg-slate-900 border border-slate-700 p-1">
+                    <div>
+                        <span id="modal-bottle-sku" class="text-xs font-mono uppercase bg-slate-700 text-slate-300 px-2 py-0.5 rounded">SKU</span>
+                        <h3 id="modal-bottle-name" class="text-xl font-bold text-white mt-1">19L Water Jug</h3>
+                    </div>
+                </div>
+                <button onclick="closeActionModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Price & Stock Info Banner -->
+            <div class="grid grid-cols-3 gap-2 bg-slate-900 p-3 rounded-xl border border-slate-700 mb-5 text-center">
+                <div>
+                    <span class="text-[11px] text-slate-400 block">Liquid Price</span>
+                    <span id="modal-liquid-price" class="font-bold text-sm text-white">Rs. 200</span>
+                </div>
+                <div class="border-x border-slate-800">
+                    <span class="text-[11px] text-slate-400 block">Bottle Deposit</span>
+                    <span id="modal-deposit-price" class="font-bold text-sm text-amber-400">Rs. 1500</span>
+                </div>
+                <div>
+                    <span class="text-[11px] text-slate-400 block">Full Stock</span>
+                    <span id="modal-full-stock" class="font-bold text-sm text-emerald-400">45</span>
+                </div>
+            </div>
+
+            <!-- Quantity Selector -->
+            <div class="flex items-center justify-between bg-slate-900/60 px-4 py-2.5 rounded-xl border border-slate-700 mb-5">
+                <span class="text-sm font-semibold text-slate-300">Quantity:</span>
+                <div class="flex items-center space-x-3">
+                    <button onclick="adjustModalQty(-1)" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold">-</button>
+                    <input type="number" id="modal-qty-input" value="1" min="1" class="w-14 text-center bg-transparent font-bold text-lg text-white focus:outline-none">
+                    <button onclick="adjustModalQty(1)" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold">+</button>
+                </div>
+            </div>
+
+            <!-- 3 Massive Action Buttons -->
+            <div class="space-y-3">
+                <button onclick="confirmAction('Exchange')" class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold flex items-center justify-between shadow-lg transition">
+                    <span class="flex items-center"><i class="fa-solid fa-rotate mr-3 text-lg"></i>1-to-1 Exchange</span>
+                    <span id="btn-price-exchange" class="text-xs bg-blue-800/80 px-2.5 py-1 rounded-lg">Liquid Only</span>
+                </button>
+
+                <button onclick="confirmAction('New_Sale')" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-between shadow-lg transition">
+                    <span class="flex items-center"><i class="fa-solid fa-cart-plus mr-3 text-lg"></i>New Sale (+ Deposit)</span>
+                    <span id="btn-price-newsale" class="text-xs bg-emerald-800/80 px-2.5 py-1 rounded-lg">Liquid + Deposit</span>
+                </button>
+
+                <button onclick="confirmAction('Empty_Return')" class="w-full py-3.5 px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold flex items-center justify-between shadow-lg transition">
+                    <span class="flex items-center"><i class="fa-solid fa-hand-holding-dollar mr-3 text-lg"></i>Empty Return (- Refund)</span>
+                    <span id="btn-price-return" class="text-xs bg-amber-800/80 px-2.5 py-1 rounded-lg">Refund Deposit</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD / EDIT BOTTLE CATALOG MODAL (WITH IMAGE UPLOAD & URL) -->
+    <div id="bottle-form-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white text-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="bottle-modal-title" class="text-lg font-bold text-slate-900">Add / Edit Bottle Type</h3>
+                <button onclick="closeBottleModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="bottle-form" onsubmit="saveBottleType(event)" class="space-y-4">
+                <input type="hidden" id="edit-bottle-id">
+
+                <!-- Product Image Upload & Live Preview Area -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center space-x-4">
+                    <div class="w-20 h-20 rounded-xl bg-slate-900 border border-slate-300 flex items-center justify-center overflow-hidden shrink-0">
+                        <img id="form-image-preview" src="images/19l-water.svg" alt="Preview" class="w-full h-full object-contain">
+                    </div>
+                    <div class="flex-1 space-y-2">
+                        <label class="block text-xs font-bold uppercase text-slate-500">Product Image (Upload Photo or Paste URL)</label>
+                        <div class="flex items-center space-x-2">
+                            <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition inline-flex items-center">
+                                <i class="fa-solid fa-upload mr-1.5"></i>Choose Photo
+                                <input type="file" id="form-image-file" accept="image/*" onchange="handleImageUpload(event)" class="hidden">
+                            </label>
+                            <span class="text-xs text-slate-400">or</span>
+                            <input type="text" id="form-image-url" oninput="handleImageUrlInput()" placeholder="Image URL / path..." class="flex-1 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-blue-600">
+                        </div>
+                        <p class="text-[11px] text-slate-400">Supports PNG, JPG, WEBP, or built-in SVG icons.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Bottle Name & Size</label>
+                    <input type="text" id="form-bottle-name" required placeholder="e.g., 19L Drinking Water Jug" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Barcode / SKU</label>
+                        <input type="text" id="form-bottle-sku" required placeholder="e.g., 1005" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Category</label>
+                        <select id="form-bottle-category" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                            <option value="Water">Water</option>
+                            <option value="Gas">Gas</option>
+                            <option value="Beverage">Beverage</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Liquid Price (Rs.)</label>
+                        <input type="number" step="0.01" id="form-liquid-price" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Deposit Value (Rs.)</label>
+                        <input type="number" step="0.01" id="form-deposit-value" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Full Stock Qty</label>
+                        <input type="number" id="form-full-qty" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Empty Stock Qty</label>
+                        <input type="number" id="form-empty-qty" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-blue-600">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeBottleModal()" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: SUPPLIER DELIVERY EXCHANGE MODAL -->
+    <div id="supplier-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white text-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-slate-900"><i class="fa-solid fa-truck text-indigo-600 mr-2"></i>Supplier Truck Restock</h3>
+                <button onclick="closeSupplierModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="processSupplierDelivery(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Select Bottle Type</label>
+                    <select id="supplier-bottle-select" class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-indigo-600"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-emerald-600 mb-1">+ Full Received</label>
+                        <input type="number" id="supplier-full-in" value="10" min="0" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase text-amber-600 mb-1">- Empties Returned</label>
+                        <input type="number" id="supplier-empty-out" value="10" min="0" required class="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm">
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    Adds incoming full bottles to shop stock and deducts empty bottles handed back to the supplier truck.
+                </p>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button type="button" onclick="closeSupplierModal()" class="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 text-slate-600">Cancel</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700">Update Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: FASTAPI BACKEND CONFIGURATION -->
+    <div id="api-config-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 text-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">FastAPI Backend Connection</h3>
+                <button onclick="closeApiConfigModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-400 mb-1">FastAPI Base URL</label>
+                    <input type="text" id="fastapi-url-input" value="http://localhost:8000" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="use-live-api-checkbox" class="rounded bg-slate-900 border-slate-700">
+                    <label for="use-live-api-checkbox" class="text-slate-300 text-xs">Send POST /transactions/ requests to live FastAPI server (falls back to LocalStorage if offline)</label>
+                </div>
+                <div class="pt-2 flex justify-end space-x-2">
+                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-xs">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center space-x-3">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-msg" class="text-sm font-medium">Transaction saved!</span>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/features.js"></script>
+</body>
+</html>

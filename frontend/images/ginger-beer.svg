@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" rx="24" fill="#0f172a"/>
+  <circle cx="100" cy="105" r="70" fill="#1e293b"/>
+  <!-- Crown Cap -->
+  <rect x="91" y="28" width="18" height="7" rx="2" fill="#f59e0b"/>
+  <!-- Amber Glass Bottle -->
+  <path d="M92 35 L108 35 L112 68 Q126 82 126 100 L126 164 Q126 172 118 172 L82 172 Q74 172 74 164 L74 100 Q74 82 88 68 Z" fill="#b45309" stroke="#fcd34d" stroke-width="2"/>
+  <!-- Label -->
+  <rect x="78" y="102" width="44" height="38" rx="4" fill="#fef3c7"/>
+  <text x="100" y="120" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#92400e" text-anchor="middle">GINGER</text>
+  <text x="100" y="133" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#b45309" text-anchor="middle">500 ML</text>
+</svg>
